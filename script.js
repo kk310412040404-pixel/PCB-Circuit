@@ -98,11 +98,18 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             try {
+                // SỬA LỖI Ở ĐÂY: Đổi x_mm thành x, y_mm thành y để Python đọc được
+                const formattedOffsets = pcbList.map(p => ({ 
+                    id: p.id, 
+                    x: p.x_mm, 
+                    y: p.y_mm 
+                }));
+
                 const response = await fetch(`${NGROK_URL}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        offsets: pcbList, 
+                        offsets: formattedOffsets, // Đã gửi đúng format
                         filename: filename,
                         analysis: analysisData
                     })
@@ -152,7 +159,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
         }
-
         function executeGeneration(filename) {
             if (!filename.endsWith('.nc')) filename += ".nc";
             btnCreate.innerHTML = '⏳ Đang xử lý...';
