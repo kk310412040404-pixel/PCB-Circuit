@@ -1,0 +1,109 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sắp xếp vị trí - Bước 3</title>
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+
+<body class="step3-layout">
+
+    <div id="server-data" 
+         data-qty="{{ qty }}" 
+         data-w="{{ w_mm }}" 
+         data-h="{{ h_mm }}"
+         style="display:none;">
+    </div>
+
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">PCB Tool - Bước 3: Sắp xếp</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid flex-grow-1 p-3">
+        <div class="row h-100">
+            
+            <div class="col-md-9 d-flex flex-column">
+                <div id="bed-container" class="rounded shadow-sm flex-grow-1">
+                    </div>
+                <div class="mt-2 text-muted small">
+                    <i>ⓘ Kéo thả các bo mạch màu vàng để sắp xếp vị trí cắt. Gốc tọa độ (0,0) nằm ở GÓC DƯỚI BÊN TRÁI.</i>
+                </div>
+            </div>
+
+            <div class="col-md-3 d-flex flex-column">
+                <div class="card mb-3 shadow-sm flex-grow-1">
+                    <div class="card-header bg-primary text-white">
+                        📍 Tọa độ hiện tại (mm)
+                    </div>
+                    <div class="card-body overflow-auto p-0" id="coords-panel">
+                        </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button id="btn-create" class="btn btn-success btn-lg py-3 fw-bold" onclick="handleCreateClick()">
+                        🛠️ TẠO V-CODE
+                    </button>
+                    
+                    <div id="action-buttons" class="d-none gap-2" style="display:flex;">
+                        <button class="btn btn-info w-50" onclick="saveFile()">💾 Tải về</button>
+                        <button class="btn btn-warning w-50" onclick="uploadToPi()">🚀 Nạp Pi</button>
+                    </div>
+                    
+                    <a href="/options" class="btn btn-outline-secondary mt-2 text-center">⬅ Quay lại Bước 2</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="filenameModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"> Lưu File G-Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">×</button>
+                </div>
+                <div class="modal-body">
+                    <label for="gcodeFilename" class="form-label fw-bold">Đặt tên file:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="gcodeFilename" value="my_pcb_panel" placeholder="Nhập tên file...">
+                        <span class="input-group-text">.nc</span>
+                    </div>
+                    <div class="mt-2 text-muted small">Nhấn Enter hoặc nút Xác nhận để tạo.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-success fw-bold" onclick="submitGcodeGeneration()">
+                         Xác nhận tạo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="successModal" class="modal">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"> Hoàn tất!</h5>
+                    <button type="button" class="btn-close" onclick="closeSuccessModal()">×</button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <div style="font-size: 50px; margin-bottom: 10px;">✅</div>
+                    <p id="successMessage" class="fw-bold" style="font-size: 1.1rem; color: #198754;"></p>
+                    <div class="text-muted small">File đã sẵn sàng để tải về hoặc nạp vào máy.</div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-success px-4" onclick="closeSuccessModal()">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+

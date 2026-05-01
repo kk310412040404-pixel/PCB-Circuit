@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepPCB Defect Assessment - Full Update</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --panel-bg: #ffffff;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --secondary: #6b7280;
+            --secondary-hover: #4b5563;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --error-bg: #fee2e2;
+            --error-text: #b91c1c;
+            --warning-bg: #fef3c7;
+            --warning-text: #b45309;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-analyze, .btn-reset {
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: none;
+        }
+
+        .btn-analyze { background-color: var(--primary); }
+        .btn-analyze:hover { background-color: var(--primary-hover); }
+        .btn-reset { background-color: var(--secondary); }
+        .btn-reset:hover { background-color: var(--secondary-hover); }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            padding: 1.5rem;
+            gap: 1.5rem;
+        }
+
+        .workspace {
+            display: flex;
+            flex: 1;
+            gap: 1.5rem;
+        }
+
+        .image-panel {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .panel-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background-color: #f9fafb;
+            font-weight: 500;
+            font-size: 0.875rem;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .panel-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-color: #e5e7eb;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .cursor-grab { cursor: grab !important; }
+        .cursor-grabbing { cursor: grabbing !important; }
+
+        .view-element {
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            -webkit-user-drag: none; 
+        }
+
+        .no-transition { transition: none !important; }
+
+        .upload-area {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--panel-bg);
+            border: 2px dashed #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 5;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+        }
+
+        .upload-area svg {
+            width: 40px;
+            height: 40px;
+            color: #9ca3af;
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar {
+            width: 350px;
+            background-color: var(--panel-bg);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-header { padding: 1rem; border-bottom: 1px solid var(--border-color); font-weight: 600; }
+        .sidebar-content { padding: 1rem; flex: 1; overflow-y: auto; }
+
+        .summary { font-size: 0.875rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--border-color); }
+
+        .log-item { padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; font-size: 0.875rem; border-left: 4px solid transparent; }
+        .log-item.error { background-color: var(--error-bg); border-left-color: var(--error-text); }
+        .log-item.warning { background-color: var(--warning-bg); border-left-color: var(--warning-text); }
+
+        .badge { font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 9999px; text-transform: uppercase; }
+        .badge-error { background-color: var(--error-text); color: white; }
+        .badge-warning { background-color: var(--warning-text); color: white; }
+
+        .log-coords { color: var(--text-muted); font-family: monospace; font-size: 0.75rem; margin-top: 0.25rem; }
+
+        .loader {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🔬 AI DeepPCB Assessment</h1>
+        <div class="action-buttons">
+            <div class="loader" id="loader"></div>
+            <button class="btn-reset" id="btnReset" onclick="resetApp()">Làm lại</button>
+            <button class="btn-analyze" id="btnAnalyze" onclick="simulateAnalysis()">Kiểm tra Bo mạch</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="workspace">
+            <div class="image-panel">
+                <div class="panel-header">Ảnh Cần Kiểm Tra (Test)</div>
+                <div class="panel-content" id="leftPanel">
+                    <div class="upload-area" id="dropZoneLeft" onclick="document.getElementById('fileInputLeft').click()">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p>Kéo thả ảnh cần kiểm tra hoặc <strong>Click</strong></p>
+                    </div>
+                    <canvas id="sourceCanvas" class="view-element" style="display: none;"></canvas>
+                    <input type="file" id="fileInputLeft" accept="image/png, image/jpeg" onchange="handleFile(this.files[0], 'left')">
+                </div>
+            </div>
+
+            <div class="image-panel">
+                <div class="panel-header">Ảnh Mẫu (Template)</div>
+                <div class="panel-content" id="middlePanel">
+                    <div class="upload-area" id="dropZoneMiddle" onclick="document.getElementById('fileInputMiddle').click()">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p>Kéo thả ảnh mẫu (Golden Board) hoặc <strong>Click</strong></p>
+                    </div>
+                    <canvas id="templateCanvas" class="view-element" style="display: none;"></canvas>
+                    <input type="file" id="fileInputMiddle" accept="image/png, image/jpeg" onchange="handleFile(this.files[0], 'middle')">
+                </div>
+            </div>
+
+            <div class="image-panel">
+                <div class="panel-header">Kết Quả Phân Tích</div>
+                <div class="panel-content" id="rightPanel">
+                    <span id="placeholderText" style="color: var(--text-muted);">Chưa có dữ liệu phân tích</span>
+                    <img id="resultImage" class="view-element" style="display: none;" alt="Kết quả từ AI">
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="sidebar-header">Chi tiết phát hiện</div>
+            <div class="sidebar-content" id="logPanel">
+                <div class="summary text-muted">Vui lòng tải đủ ảnh Gốc và ảnh Mẫu để bắt đầu.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const btnAnalyze = document.getElementById('btnAnalyze');
+        const btnReset = document.getElementById('btnReset');
+        const loader = document.getElementById('loader');
+        const logPanel = document.getElementById('logPanel');
+        const resultImage = document.getElementById('resultImage');
+        const placeholderText = document.getElementById('placeholderText');
+
+        const panels = {
+            left: {
+                dropZone: document.getElementById('dropZoneLeft'),
+                canvas: document.getElementById('sourceCanvas'),
+                input: document.getElementById('fileInputLeft'),
+                container: document.getElementById('leftPanel'),
+                imageObj: null
+            },
+            middle: {
+                dropZone: document.getElementById('dropZoneMiddle'),
+                canvas: document.getElementById('templateCanvas'),
+                input: document.getElementById('fileInputMiddle'),
+                container: document.getElementById('middlePanel'),
+                imageObj: null
+            }
+        };
+
+        const viewStates = {
+            left: { scale: 1, translateX: 0, translateY: 0 },
+            middle: { scale: 1, translateX: 0, translateY: 0 },
+            right: { scale: 1, translateX: 0, translateY: 0 }
+        };
+
+        const classInfo = {
+            1: { name: 'open', type: 'ERROR' },
+            2: { name: 'short', type: 'ERROR' },
+            3: { name: 'mousebite', type: 'WARNING' },
+            4: { name: 'spur', type: 'WARNING' },
+            5: { name: 'copper', type: 'WARNING' },
+            6: { name: 'pinhole', type: 'WARNING' }
+        };
+
+        // --- Logic Xử Lý Ảnh ---
+        function handleFile(file, side) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    panels[side].imageObj = img;
+                    const canvas = panels[side].canvas;
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    panels[side].dropZone.style.display = 'none';
+                    canvas.style.display = 'block';
+                    panels[side].container.classList.add('cursor-grab');
+                    
+                    checkReady();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function checkReady() {
+            if (panels.left.imageObj && panels.middle.imageObj) {
+                btnAnalyze.style.display = 'block';
+                btnReset.style.display = 'block';
+                logPanel.innerHTML = '<div class="summary">Đã sẵn sàng. Nhấn nút để kiểm tra.</div>';
+            }
+        }
+
+        // --- Zoom & Pan Logic ---
+        function updateView(side, animate = true) {
+            const state = viewStates[side];
+            let target;
+            if (side === 'left') target = panels.left.canvas;
+            else if (side === 'middle') target = panels.middle.canvas;
+            else target = resultImage;
+
+            const transformStyle = `translate(${state.translateX}px, ${state.translateY}px) scale(${state.scale})`;
+            target.classList.toggle('no-transition', !animate);
+            target.style.transform = transformStyle;
+        }
+
+        function attachEvents(container, side) {
+            let isDragging = false, startX, startY;
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const direction = e.deltaY < 0 ? 1 : -1;
+                const state = viewStates[side];
+                state.scale = Math.min(Math.max(0.5, state.scale + direction * 0.15 * state.scale), 10);
+                updateView(side, true);
+            });
+
+            container.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.upload-area')) return;
+                isDragging = true;
+                startX = e.clientX - viewStates[side].translateX;
+                startY = e.clientY - viewStates[side].translateY;
+                container.classList.add('cursor-grabbing');
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                viewStates[side].translateX = e.clientX - startX;
+                viewStates[side].translateY = e.clientY - startY;
+                updateView(side, false);
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                container.classList.remove('cursor-grabbing');
+            });
+
+            // Drag & Drop UI
+            container.addEventListener('dragover', (e) => { e.preventDefault(); container.querySelector('.upload-area')?.classList.add('dragover'); });
+            container.addEventListener('dragleave', () => { container.querySelector('.upload-area')?.classList.remove('dragover'); });
+            container.addEventListener('drop', (e) => {
+                e.preventDefault();
+                container.querySelector('.upload-area')?.classList.remove('dragover');
+                if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0], side);
+            });
+        }
+
+        attachEvents(panels.left.container, 'left');
+        attachEvents(panels.middle.container, 'middle');
+        attachEvents(document.getElementById('rightPanel'), 'right');
+
+
+        function loadImageToPanel(url, side) {
+            return new Promise((resolve) => {
+                const img = new Image();
+
+                img.onload = function() {
+                    panels[side].imageObj = img;
+
+                    const canvas = panels[side].canvas;
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    canvas.getContext('2d').drawImage(img, 0, 0);
+
+                    panels[side].dropZone.style.display = 'none';
+                    canvas.style.display = 'block';
+                    panels[side].container.classList.add('cursor-grab');
+
+                    resolve();
+                };
+
+                img.src = url;
+            });
+        }
+
+        window.onload = async function() {
+            const params = new URLSearchParams(window.location.search);
+
+            const defectName = params.get("defect");
+            const optimizedName = params.get("optimized");
+
+            if (!defectName || !optimizedName) return;
+
+            await loadImageToPanel(`/image/${defectName}`, 'left');   // Test
+            await loadImageToPanel(`/image/${optimizedName}`, 'middle'); // Template
+
+            checkReady();
+        };
+        // --- API & Analysis ---
+        async function simulateAnalysis() {
+            loader.style.display = 'block';
+            btnAnalyze.disabled = true;
+            placeholderText.innerText = "Đang phân tích...";
+
+            const params = new URLSearchParams(window.location.search);
+            const defect = params.get("defect");   // ví dụ: DEFECTIVE_my_pcb_panel64.nc.png
+
+            if (!defect) {
+                alert("Thiếu ảnh DEFECTIVE");
+                return;
+            }
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_name: defect })
+                });
+
+                if (!response.ok) throw new Error("Server error");
+
+                const data = await response.json();
+
+                resultImage.src = data.result_image;
+                resultImage.style.display = 'block';
+                placeholderText.style.display = 'none';
+
+                renderLogs(data.detections);
+
+            } catch (e) {
+                alert("Lỗi kết nối AI!");
+                placeholderText.innerText = "Lỗi";
+            } finally {
+                loader.style.display = 'none';
+                btnAnalyze.disabled = false;
+            }
+        }
+
+        function renderLogs(predictions) {
+            let html = '', errors = 0, warnings = 0;
+            predictions.forEach(p => {
+                const info = classInfo[p.class_id] || { name: 'Unknown', type: 'WARNING' };
+                if (info.type === 'ERROR') errors++; else warnings++;
+                html += `
+                    <div class="log-item ${info.type.toLowerCase()}">
+                        <div class="log-header"><strong>${info.name.toUpperCase()}</strong> <span class="badge badge-${info.type.toLowerCase()}">${info.type}</span></div>
+                        <div>Độ tin cậy: ${(p.score * 100).toFixed(1)}%</div>
+                        <div class="log-coords">Tọa độ: [${p.box.join(', ')}]</div>
+                    </div>`;
+            });
+            logPanel.innerHTML = `<div class="summary"><strong>Phát hiện ${predictions.length} vấn đề</strong><br>
+                <span style="color:var(--error-text)">● ${errors} Lỗi</span> | <span style="color:var(--warning-text)">● ${warnings} Cảnh báo</span></div>` + html;
+        }
+
+        function resetApp() {
+            location.reload(); // Cách nhanh nhất để reset toàn bộ trạng thái
+        }
+    </script>
+</body>
+</html>

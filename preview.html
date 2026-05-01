@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Code Simulation Pro - Safe Check</title>
+    
+    <script src="{{ url_for('static', filename='three.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='OrbitControls.js') }}"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- GLOBAL STYLE --- */
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f0f0; }
+        
+        #container { position: relative; width: 100vw; height: 100vh; display: flex; }
+
+        /* --- 1. VÙNG 3D (TRÁI) --- */
+        #canvas-wrapper { 
+            flex-grow: 1; 
+            position: relative; 
+            background: #1e1e1e; /* Màu nền tối kỹ thuật */
+            overflow: hidden;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 15px 30px; border-radius: 8px;
+            display: none; z-index: 1000; font-weight: bold;
+        }
+
+        /* --- HỘP CẢNH BÁO AN TOÀN --- */
+        #alert-box { 
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); 
+            background: rgba(220, 53, 69, 0.95); color: white; 
+            padding: 10px 20px; border-radius: 5px; display: none; 
+            z-index: 200; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 1px solid #ff6b6b; text-align: center;
+        }
+
+        /* --- 2. THANH ĐIỀU KHIỂN NỔI (FLOATING PILL) --- */
+        #control-pill {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px);
+            padding: 8px 25px; border-radius: 50px;
+            display: flex; align-items: center; gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 100;
+        }
+
+        .btn-icon {
+            background: none; border: none; color: #444; font-size: 20px; 
+            cursor: pointer; width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .btn-icon:hover { background: #eee; color: #007bff; transform: scale(1.1); }
+        #btn-play { color: #28a745; font-size: 22px; }
+
+        .speed-group {
+            display: flex; align-items: center; gap: 8px; font-size: 13px; color: #666;
+            border-left: 1px solid #ccc; padding-left: 15px; font-weight: 700;
+        }
+        input[type=range] { width: 80px; cursor: pointer; accent-color: #007bff; }
+
+        #mini-dro {
+            font-family: 'Consolas', monospace; font-size: 14px;
+            border-left: 1px solid #ccc; padding-left: 15px;
+            display: flex; gap: 15px; font-weight: bold; color: #333;
+        }
+        .dro-val { color: #d63384; min-width: 50px; display: inline-block; text-align: left; }
+
+        /* --- 3. SIDEBAR (PHẢI) --- */
+        #sidebar {
+            width: 360px; background: #ffffff; border-left: 1px solid #ddd;
+            display: flex; flex-direction: column; height: 100vh;
+            box-shadow: -4px 0 15px rgba(0,0,0,0.05); z-index: 20;
+        }
+
+        /* Header Tên File */
+        #file-header {
+            padding: 15px; background: #f8f9fa; border-bottom: 1px solid #e9ecef;
+            font-weight: 600; color: #333; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        /* List Code (Cuộn) */
+        #gcode-list {
+            flex-grow: 1; overflow-y: auto;
+            font-family: 'Consolas', monospace; font-size: 13px;
+            padding: 5px 0; background: #fff;
+        }
+
+        .gc-line { 
+            padding: 4px 10px; display: flex; border-bottom: 1px solid transparent; 
+            cursor: pointer; transition: background 0.1s;
+        }
+        .gc-line:hover { background: #f0f8ff; }
+        
+        .active-line {
+            background: #fff3cd !important;
+            border-left: 5px solid #ffc107;
+            font-weight: bold;
+        }
+
+        .ln { color: #bbb; min-width: 35px; text-align: right; margin-right: 15px; user-select: none; font-size: 11px; }
+        .cd { color: #333; white-space: pre; }
+        .coord { color: #0056b3; font-weight: bold; }
+        .comment { color: #28a745; font-style: italic; }
+
+        /* Action Panel */
+        #action-panel {
+            flex-shrink: 0; padding: 20px; background: #f1f3f5;
+            display: flex; flex-direction: column; gap: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        .btn-action {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 12px; border: none; border-radius: 6px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            text-transform: uppercase; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        
+        .btn-primary { background: #007bff; color: white; }
+        .btn-info { background: #17a2b8; color: white; } /* CSS MỚI CHO NÚT ĐÁNH GIÁ */
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #fff; color: #dc3545; border: 1px solid #dc3545; }
+        .btn-danger:hover { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <div id="canvas-wrapper">
+        <div id="loading"><i class="fas fa-spinner fa-spin"></i> Đang xử lý G-Code...</div>
+        
+        <div id="alert-box">
+            <i class="fas fa-exclamation-triangle" style="font-size: 24px; display: block; margin-bottom: 5px;"></i> 
+            <span id="alert-msg"></span>
+        </div>
+        
+        <div id="control-pill">
+            <button class="btn-icon" onclick="resetSim()" title="Reset về đầu"><i class="fas fa-step-backward"></i></button>
+            <button class="btn-icon" id="btn-play" onclick="togglePlay()" title="Chạy / Dừng"><i class="fas fa-play"></i></button>
+            
+            <div class="speed-group">
+                <i class="fas fa-tachometer-alt"></i>
+                <input type="range" id="speed-slider" min="1" max="10" step="1" value="1" oninput="updateSpeedLabel(this.value)">
+                <span id="speed-label" style="min-width: 30px; text-align:center">1x</span>
+            </div>
+
+            <div id="mini-dro">
+                <span>X <span id="x-val" class="dro-val">0.00</span></span>
+                <span>Y <span id="y-val" class="dro-val">0.00</span></span>
+                <span>Z <span id="z-val" class="dro-val">0.00</span></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div id="file-header">
+            <div><i class="far fa-file-alt" style="color:#007bff; font-size:18px;"></i> <span id="filename-display">loading...</span></div>
+        </div>
+
+        <div id="gcode-list"></div>
+
+        <div id="action-panel">
+            <button class="btn-action btn-primary" onclick="uploadToRespi()">
+                <i class="fas fa-microchip"></i> Nạp Respi
+            </button>
+            
+            <button class="btn-action btn-info" onclick="goToAssessment()">
+                <i class="fas fa-clipboard-check"></i> Tiến hành đánh giá
+            </button>
+
+            <div style="display:flex; gap:10px;">
+                <button class="btn-action btn-warning" onclick="backToStep3()" style="flex:1">
+                    <i class="fas fa-arrow-left"></i> Sửa Lỗi Vị Trí
+                </button>
+                <button class="btn-action btn-danger" onclick="newCircuit()" style="flex:1">
+                    <i class="fas fa-trash-alt"></i> Làm mới
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CẤU HÌNH ---
+    const MACHINE_WIDTH = 200; // X
+    const MACHINE_HEIGHT = 150; // Y
+    const BG_COLOR = 0x222222;
+    const COLOR_CUT = 0x0099ff; // Xanh dương
+    const COLOR_MOVE = 0xff3333; // Đỏ
+
+    // --- BIẾN TOÀN CỤC ---
+    let scene, camera, renderer, controls, toolGroup, drillTip, millTip;
+    let gcodeData = [];
+    let currentCmdIndex = 0;
+    let isPlaying = false;
+    let simSpeedMultiplier = 1;
+
+    // BIẾN QUẢN LÝ VÙNG AN TOÀN (BOUNDS CHECK)
+    let bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    let hasCut = false;
+    let boundingBoxMesh = null;
+
+    // BIẾN THROTTLING (CHỐNG LAG)
+    let lastUIUpdateTime = 0;
+    const UI_UPDATE_INTERVAL = 200; // 200ms mới cập nhật scroll 1 lần
+
+    // --- 1. KHỞI TẠO 3D ---
+    function init() {
+        const container = document.getElementById('canvas-wrapper');
+        
+        scene = new THREE.Scene(); 
+        scene.background = new THREE.Color(BG_COLOR);
+
+        // Camera: Căn chỉnh để nhìn toàn bộ bàn máy 200x150
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(MACHINE_WIDTH/2, -80, 180); 
+        camera.up.set(0, 0, 1);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); 
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(MACHINE_WIDTH/2, MACHINE_HEIGHT/2, 0); 
+        controls.enableDamping = true;
+
+        // Ánh sáng
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, -50, 100); 
+        scene.add(dirLight);
+
+        // VẼ BÀN MÁY CUSTOM
+        drawCustomBed(MACHINE_WIDTH, MACHINE_HEIGHT);
+        
+        // Trục tọa độ tại (0,0) - Góc bàn máy
+        scene.add(new THREE.AxesHelper(20));
+
+        createSmartTool();
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        animate();
+        loadGcode();
+    }
+
+    // --- HÀM VẼ BÀN MÁY (CUSTOM BED) ---
+    function drawCustomBed(w, h) {
+        // Viền bàn máy (Màu cam đậm) - Z = 0
+        const borderMat = new THREE.LineBasicMaterial({ color: 0xff6600, linewidth: 2 });
+        const borderPoints = [
+            new THREE.Vector3(0, 0, 0), new THREE.Vector3(w, 0, 0),
+            new THREE.Vector3(w, 0, 0), new THREE.Vector3(w, h, 0),
+            new THREE.Vector3(w, h, 0), new THREE.Vector3(0, h, 0),
+            new THREE.Vector3(0, h, 0), new THREE.Vector3(0, 0, 0)
+        ];
+        scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(borderPoints), borderMat));
+
+        // Lưới bên trong (Màu xám) - Hạ thấp Z = -0.05mm
+        const gridZ = -0.05; 
+        const gridMat = new THREE.LineBasicMaterial({ color: 0x444444, opacity: 0.3, transparent: true });
+        const gridPoints = [];
+
+        for (let x = 10; x < w; x += 10) {
+            gridPoints.push(new THREE.Vector3(x, 0, gridZ));
+            gridPoints.push(new THREE.Vector3(x, h, gridZ));
+        }
+        for (let y = 10; y < h; y += 10) {
+            gridPoints.push(new THREE.Vector3(0, y, gridZ));
+            gridPoints.push(new THREE.Vector3(w, y, gridZ));
+        }
+        scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gridPoints), gridMat));
+
+        // Mặt nền tối - Hạ thấp Z = -0.1mm
+        const planeGeo = new THREE.PlaneGeometry(w, h);
+        const planeMat = new THREE.MeshBasicMaterial({ color: 0x111111, side: THREE.DoubleSide });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.position.set(w/2, h/2, -0.1); 
+        scene.add(plane);
+    }
+
+    function createSmartTool() {
+        toolGroup = new THREE.Group();
+        const s = new THREE.Mesh(new THREE.CylinderGeometry(2,2,15,32), new THREE.MeshPhongMaterial({color:0xbdc3c7}));
+        s.rotation.x=Math.PI/2; s.position.z=12.5; toolGroup.add(s);
+        millTip = new THREE.Mesh(new THREE.CylinderGeometry(2,2,5,32), new THREE.MeshPhongMaterial({color:0xf1c40f}));
+        millTip.rotation.x=Math.PI/2; millTip.position.z=2.5; toolGroup.add(millTip);
+        drillTip = new THREE.Mesh(new THREE.ConeGeometry(2,5,32), new THREE.MeshPhongMaterial({color:0xe74c3c}));
+        drillTip.rotation.x=Math.PI/2; drillTip.position.z=2.5; drillTip.visible=false; toolGroup.add(drillTip);
+        scene.add(toolGroup);
+    }
+
+    // --- 2. XỬ LÝ G-CODE & SAFE CHECK ---
+    function loadGcode() {
+        const urlParams = new URLSearchParams(location.search);
+        const filename = urlParams.get('filename') || 'output.nc';
+        document.getElementById('filename-display').innerText = filename;
+        document.getElementById('loading').style.display = 'block';
+
+        fetch(`/api/get_last_gcode?filename=${filename}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                if(data.status === 'ok') parseGcode(data.content);
+            });
+    }
+
+    function parseGcode(text) {
+        const lines = text.split('\n');
+        const listEl = document.getElementById('gcode-list');
+        listEl.innerHTML = '';
+        gcodeData = [];
+        
+        // Reset bounds
+        bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        hasCut = false;
+        if(boundingBoxMesh) { scene.remove(boundingBoxMesh); boundingBoxMesh = null; }
+
+        let cur = {x:0, y:0, z:10}; 
+        let drillCycle = { active: false, r: 2.0, z: -1.0 }; 
+        let pointsCut=[], pointsMove=[];
+
+        const fragment = document.createDocumentFragment();
+
+        lines.forEach((line, i) => {
+            const raw = line.trim();
+            const div = document.createElement('div');
+            div.className = 'gc-line'; div.id = `ln-${i}`; 
+            div.onclick = () => seekTo(i);
+            
+            let html = `<span class="ln">${i+1}</span>`;
+            if(raw.startsWith('(')||raw.startsWith(';')) {
+                html += `<span class="comment">${raw}</span>`;
+            } else {
+                html += `<span class="cd">${raw.replace(/([XYZRF])([-\d.]+)/g, '<span class="coord">$1$2</span>')}</span>`;
+            }
+            div.innerHTML = html; 
+            fragment.appendChild(div);
+
+            if (!raw || raw.startsWith('(') || raw.startsWith('%')) return;
+            if (raw.includes('G80')) { drillCycle.active = false; return; }
+            if (raw.includes('G81')) {
+                drillCycle.active = true;
+                const rMatch = /R([-\d.]+)/i.exec(raw);
+                const zMatch = /Z([-\d.]+)/i.exec(raw);
+                if(rMatch) drillCycle.r = parseFloat(rMatch[1]);
+                if(zMatch) drillCycle.z = parseFloat(zMatch[1]);
+            }
+
+            let next = {...cur}; let hasMove = false;
+            const mx=/X([-\d.]+)/i.exec(raw), my=/Y([-\d.]+)/i.exec(raw), mz=/Z([-\d.]+)/i.exec(raw);
+            if(mx){next.x=parseFloat(mx[1]); hasMove=true;}
+            if(my){next.y=parseFloat(my[1]); hasMove=true;}
+            if(mz){next.z=parseFloat(mz[1]); hasMove=true;}
+
+            if(hasMove) {
+                // UPDATE BOUNDS LOGIC
+                const isCut = raw.includes('G1') || raw.includes('G01') || next.z < 0 || drillCycle.active;
+                if (isCut) {
+                    bounds.minX = Math.min(bounds.minX, next.x);
+                    bounds.maxX = Math.max(bounds.maxX, next.x);
+                    bounds.minY = Math.min(bounds.minY, next.y);
+                    bounds.maxY = Math.max(bounds.maxY, next.y);
+                    hasCut = true;
+                }
+
+                if (drillCycle.active && !raw.includes('G80') && !raw.includes('G0') && !raw.includes('G1') && !raw.includes('M')) {
+                    let retractPos = { x: next.x, y: next.y, z: drillCycle.r };
+                    let bottomPos = { x: next.x, y: next.y, z: drillCycle.z };
+                    
+                    gcodeData.push({ index: i, pos: retractPos, isDrill: false });
+                    pointsMove.push(new THREE.Vector3(cur.x, cur.y, cur.z), new THREE.Vector3(retractPos.x, retractPos.y, retractPos.z));
+
+                    gcodeData.push({ index: i, pos: bottomPos, isDrill: true });
+                    pointsCut.push(new THREE.Vector3(retractPos.x, retractPos.y, retractPos.z), new THREE.Vector3(bottomPos.x, bottomPos.y, bottomPos.z));
+
+                    gcodeData.push({ index: i, pos: retractPos, isDrill: false });
+                    cur = retractPos;
+                } else {
+                    gcodeData.push({ index: i, pos: {...next}, isDrill: false });
+                    const p1 = new THREE.Vector3(cur.x, cur.y, cur.z);
+                    const p2 = new THREE.Vector3(next.x, next.y, next.z);
+                    if(isCut) pointsCut.push(p1, p2); else pointsMove.push(p1, p2);
+                    cur = next;
+                }
+            }
+        });
+
+        listEl.appendChild(fragment);
+
+        if (pointsCut.length) scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pointsCut), new THREE.LineBasicMaterial({ color: COLOR_CUT })));
+        if (pointsMove.length) scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pointsMove), new THREE.LineBasicMaterial({ color: COLOR_MOVE, opacity: 0.4, transparent: true })));
+    
+        // GỌI HÀM KIỂM TRA LỖI TỌA ĐỘ
+        validateBounds(hasCut);
+    }
+
+    // --- HÀM KIỂM TRA KHUNG MẠCH CHẠY THỰC TẾ ---
+    function validateBounds(hasCut) {
+        if(!hasCut) return;
+
+        const w = bounds.maxX - bounds.minX;
+        const h = bounds.maxY - bounds.minY;
+        const cx = (bounds.minX + bounds.maxX) / 2;
+        const cy = (bounds.minY + bounds.maxY) / 2;
+
+        // Vẽ Khung bao quanh (Bounding Box)
+        const boxGeo = new THREE.BoxGeometry(w, h, 0.5);
+        const boxMat = new THREE.MeshBasicMaterial({color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.4});
+        boundingBoxMesh = new THREE.Mesh(boxGeo, boxMat);
+        boundingBoxMesh.position.set(cx, cy, 0);
+        scene.add(boundingBoxMesh);
+
+        // Xác định lỗi lọt ra ngoài bàn 200x150
+        let errorMsg = "";
+        if (bounds.minX < 0) errorMsg += `Lệch TRÁI ${(0 - bounds.minX).toFixed(1)}mm. <br>`;
+        if (bounds.minY < 0) errorMsg += `Lệch DƯỚI ${(0 - bounds.minY).toFixed(1)}mm. <br>`;
+        if (bounds.maxX > MACHINE_WIDTH) errorMsg += `Lệch PHẢI ${(bounds.maxX - MACHINE_WIDTH).toFixed(1)}mm. <br>`;
+        if (bounds.maxY > MACHINE_HEIGHT) errorMsg += `Lệch TRÊN ${(bounds.maxY - MACHINE_HEIGHT).toFixed(1)}mm. <br>`;
+
+        if (errorMsg) {
+            // Hiện bảng cảnh báo
+            const el = document.getElementById('alert-box');
+            el.style.display = "block";
+            document.getElementById('alert-msg').innerHTML = "MẠCH BỊ LỆCH KHỎI BÀN MÁY! <br>" + errorMsg + "Vui lòng 'Sửa Lỗi Vị Trí' để dịch chuyển mạch.";
+            
+            // Đổi khung bao thành màu Đỏ
+            boundingBoxMesh.material.color.setHex(0xff0000);
+            boundingBoxMesh.material.opacity = 0.8;
+            boundingBoxMesh.material.wireframe = false;
+        }
+    }
+
+    // --- 3. ANIMATION & CONTROL ---
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+
+        if (isPlaying && currentCmdIndex < gcodeData.length) {
+            const targetStep = gcodeData[currentCmdIndex];
+            const targetPos = new THREE.Vector3(targetStep.pos.x, targetStep.pos.y, targetStep.pos.z);
+            const currentPos = toolGroup.position.clone();
+            const distance = currentPos.distanceTo(targetPos);
+            
+            const baseSpeed = 0.5;
+            const stepSpeed = baseSpeed * simSpeedMultiplier * (targetStep.isDrill ? 0.5 : 2.0);
+
+            if (distance > stepSpeed) {
+                const dir = targetPos.clone().sub(currentPos).normalize();
+                toolGroup.position.add(dir.multiplyScalar(stepSpeed));
+                updateDRO(targetStep.pos); 
+            } else {
+                toolGroup.position.copy(targetPos);
+                
+                const now = Date.now();
+                if (now - lastUIUpdateTime > UI_UPDATE_INTERVAL) {
+                    highlightRow(targetStep.index);
+                    lastUIUpdateTime = now;
+                }
+                
+                updateDRO(targetStep.pos);
+                millTip.visible = !targetStep.isDrill;
+                drillTip.visible = targetStep.isDrill;
+                
+                currentCmdIndex++;
+            }
+        } else if (currentCmdIndex >= gcodeData.length && isPlaying) {
+            isPlaying = false;
+            updatePlayIcon();
+            if(gcodeData.length > 0) highlightRow(gcodeData[gcodeData.length-1].index);
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    function updateDRO(pos) {
+        document.getElementById('x-val').innerText = pos.x.toFixed(2);
+        document.getElementById('y-val').innerText = pos.y.toFixed(2);
+        document.getElementById('z-val').innerText = pos.z.toFixed(2);
+    }
+
+    function highlightRow(idx) {
+        const prev = document.querySelector('.active-line');
+        if (prev) prev.classList.remove('active-line');
+        const row = document.getElementById(`ln-${idx}`);
+        if (row) {
+            row.classList.add('active-line');
+            row.scrollIntoView({ block: 'center', behavior: 'auto' });
+        }
+    }
+
+    function togglePlay() {
+        if(currentCmdIndex >= gcodeData.length) currentCmdIndex = 0;
+        isPlaying = !isPlaying;
+        updatePlayIcon();
+    }
+
+    function updatePlayIcon() {
+        const icon = document.querySelector('#btn-play i');
+        if(isPlaying) {
+            icon.className = 'fas fa-pause';
+            document.getElementById('btn-play').style.color = '#ff9800'; 
+        } else {
+            icon.className = 'fas fa-play';
+            document.getElementById('btn-play').style.color = '#28a745'; 
+        }
+    }
+
+    function resetSim() {
+        isPlaying = false; updatePlayIcon(); currentCmdIndex = 0;
+        toolGroup.position.set(0,0,10);
+        document.getElementById('gcode-list').scrollTop = 0;
+        highlightRow(0);
+        updateDRO({x:0, y:0, z:0});
+    }
+
+    function seekTo(idx) {
+        isPlaying = false; updatePlayIcon();
+        const found = gcodeData.findIndex(g => g.index >= idx);
+        if(found !== -1) {
+            currentCmdIndex = found;
+            const step = gcodeData[found];
+            toolGroup.position.set(step.pos.x, step.pos.y, step.pos.z);
+            updateDRO(step.pos);
+            highlightRow(idx);
+            
+            millTip.visible = !step.isDrill;
+            drillTip.visible = step.isDrill;
+        }
+    }
+
+    function updateSpeedLabel(val) {
+        simSpeedMultiplier = parseInt(val);
+        document.getElementById('speed-label').innerText = val + 'x';
+    }
+
+    function uploadToRespi() { alert("Đang nạp code xuống Respi..."); }
+    function backToStep3() { window.location.href = '/position'; }
+    function newCircuit() { if(confirm("Bạn có chắc muốn làm mạch mới?")) window.location.href = '/'; }
+    
+    // HÀM CHUYỂN TRANG MỚI ĐẾN MODULE AI ASSESSMENT
+    async function goToAssessment() {
+        const params = new URLSearchParams(window.location.search);
+        const filename = params.get("filename");
+
+        const res = await fetch(`/api/get_latest_optimized_image?filename=${filename}`);
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+            // CHỈ truyền ảnh
+            window.location.href = `/assessment?defect=${data.defective}&optimized=${data.optimized}`;
+        } else {
+            alert(data.message);
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>

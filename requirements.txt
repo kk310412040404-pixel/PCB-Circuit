@@ -1,0 +1,12 @@
+flask
+flask-cors
+opencv-python  # Dùng bản headless cho server Linux
+numpy
+torch
+torchvision
+albumentations
+pdf2image
+pymupdf
+serial
+random
+gunicorn  # Web server chuyên nghiệp để chạy trên Render
