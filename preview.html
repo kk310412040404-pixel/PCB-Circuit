@@ -555,7 +555,7 @@
         const params = new URLSearchParams(window.location.search);
         const filename = params.get("filename");
 
-        const res = await fetch(`/api/get_latest_optimized_image?filename=${filename}`);
+        const res = await fetch(`https://modish-jay-unviolently.ngrok-free.dev/api/get_latest_optimized_image?filename=${filename}`);
         const data = await res.json();
 
         if (data.status === 'ok') {
