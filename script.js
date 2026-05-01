@@ -82,12 +82,14 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         window.submitGcodeGeneration = async function() {
-            const inputEl = document.getElementById('gcodeFilename');
+            // Tự động tìm đúng ID dù giao diện có thay đổi
+            const inputEl = document.getElementById('gcodeFilename') || document.getElementById('filenameInput');
             let filename = inputEl ? inputEl.value : "output.nc";
+            
             if (!filename.trim()) filename = "output.nc";
             if (!filename.endsWith('.nc')) filename += ".nc";
 
-            const analysisData = JSON.parse(localStorage.getItem('pcb_analysis'));
+            const analysisData = JSON.parse(localStorage.getItem('pcb_analysis') || '{}');
             
             const btnConfirm = document.querySelector('#filenameModal .btn-success');
             if(btnConfirm) {
@@ -102,31 +104,37 @@ document.addEventListener("DOMContentLoaded", function() {
                     body: JSON.stringify({ 
                         offsets: pcbList, 
                         filename: filename,
-                        analysis: analysisData // Truyền dữ liệu về cho Python
+                        analysis: analysisData
                     })
                 });
                 const data = await response.json();
                 
                 if (data.status === 'ok') {
-                    // Lưu tên file vào bộ nhớ trình duyệt
                     localStorage.setItem('pcb_gcode_filename', data.filename);
                     
-                    // --- ĐÃ SỬA FIX LỖI: Đóng modal trực tiếp không dùng hàm ngoài ---
                     const fModal = document.getElementById('filenameModal');
                     if (fModal) fModal.classList.remove('show');
                     
+                    const successMsg = document.getElementById('successMessage');
                     if (successMsg) successMsg.innerText = `Đã tạo xong file: ${data.filename}`;              
-                    document.querySelector('#successModal .modal-footer').innerHTML = `
-                        <button type="button" class="btn btn-secondary" onclick="closeSuccessModal()">Đóng</button>
-                        <a href="preview.html?filename=${data.filename}" class="btn btn-primary fw-bold">
-                            👁️ Xem mô phỏng (3D)
-                        </a>
-                    `;
                     
+                    const modalFooter = document.querySelector('#successModal .modal-footer');
+                    if(modalFooter) {
+                        modalFooter.innerHTML = `
+                            <button type="button" class="btn btn-secondary" onclick="closeSuccessModal()">Đóng</button>
+                            <a href="preview.html?filename=${data.filename}" class="btn btn-primary fw-bold">
+                                👁️ Xem mô phỏng (3D)
+                            </a>
+                        `;
+                    }
+                    
+                    const successModal = document.getElementById('successModal');
                     if (successModal) successModal.classList.add('show');
                     
-                    // Ẩn nút "Tạo V-CODE" và hiện cụm nút Lưu/Nạp CNC
+                    const btnCreate = document.getElementById('btn-create');
                     if(btnCreate) btnCreate.style.display = 'none';
+                    
+                    const actionDiv = document.getElementById('action-buttons');
                     if(actionDiv) {
                         actionDiv.classList.remove('d-none');
                         actionDiv.style.display = 'flex';     
@@ -138,7 +146,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 alert("Lỗi kết nối server Ngrok!");
                 console.error(e);
             } finally {
-                // Phục hồi lại nút bấm nếu bị lỗi
                 if(btnConfirm) {
                     btnConfirm.innerHTML = 'Xác nhận tạo';
                     btnConfirm.disabled = false;
