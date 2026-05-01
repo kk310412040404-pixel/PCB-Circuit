@@ -4,100 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Review & Tùy chọn</title>
-    <link rel="stylesheet" href="style.css">
+    <link href="style.css" rel="stylesheet">
 </head>
-
 <body class="step2-layout"> 
-
     <nav class="navbar navbar-dark bg-dark mb-4 shadow-sm">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">PCB Tool - Bước 2</span>
-        </div>
+        <div class="container-fluid"><span class="navbar-brand mb-0 h1">PCB Tool - Bước 2</span></div>
     </nav>
-
     <div class="container-fluid px-4">
         <div class="row">
             <div class="col-md-4 col-lg-3">
-                
                 <div class="card shadow-sm mb-3">
                     <div class="card-header bg-primary text-white">⚙️ Cấu hình cắt</div>
                     <div class="card-body">
                         <div class="alert alert-info py-2">
                             <h6 class="alert-heading fw-bold mb-1">Kích thước mạch:</h6>
-                            <span>Rộng: <strong>{{ w_mm }} mm</strong></span><br>
-                            <span>Cao: <strong>{{ h_mm }} mm</strong></span>
+                            <span>Rộng: <strong id="val_w">0</strong> mm</span><br>
+                            <span>Cao: <strong id="val_h">0</strong> mm</span>
                         </div>
-                        <form action="https://modish-jay-unviolently.ngrok-free.dev/set_options" method="POST">
+                        <form id="optionsForm">
                             <div class="mb-3">
-                                <label for="quantity" class="form-label fw-bold">Số lượng mạch:</label>
-                                <input type="number" class="form-control form-control-lg text-center fw-bold"
-                                     id="quantity" name="quantity" value="1" min="1" max="50" required>
-                                <div class="form-text">Nhập số lượng để nhân bản mạch.</div>
+                                <label class="form-label fw-bold">Số lượng mạch muốn làm:</label>
+                                <input type="number" id="quantity" class="form-control" value="1" min="1">
                             </div>
-                            <hr>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-success btn-lg">TIẾP TỤC &rarr;</button>
-                            </div>
+                            <button type="submit" class="btn btn-success w-100 fw-bold">TIẾP THEO &rarr;</button>
                         </form>
                     </div>
                 </div>
-                
-                <div class="card shadow-sm">
-                    <div class="card-header bg-secondary text-white">ℹ️ Lưu ý</div>
-                    <div class="card-body small text-muted">
-                        <ul class="mb-0 ps-3">
-                            <li>Kiểm tra kỹ hình ảnh bên phải.</li>
-                            <li>Nếu ảnh bị méo, hãy nhấn "Làm lại".</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="d-grid mt-3">
-                    <a href="/" class="btn btn-outline-secondary btn-lg fw-bold">
-                        &larr; LÀM LẠI TỪ ĐẦU
-                    </a>
-                </div>
-
             </div>
-
             <div class="col-md-8 col-lg-9">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white p-0">
-                        <ul class="nav nav-tabs" id="myTab">
-                            <li class="nav-item">
-                                <button class="nav-link active rounded-0" data-bs-target="#trace">Trace</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link rounded-0" data-bs-target="#drill">Drill</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link rounded-0" data-bs-target="#outline">Outline</button>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div class="card-body text-center bg-light d-flex align-items-center justify-content-center" style="min-height: 400px;">
+                <div class="card shadow-sm">
+                    <div class="card-body text-center bg-light">
                         <div class="tab-content w-100">
                             <div class="tab-pane fade show active" id="trace">
-                                <img src="https://modish-jay-unviolently.ngrok-free.dev/image/FINAL_trace.png" class="preview-img shadow-sm" alt="Trace">
-                                <div class="mt-2 text-muted fst-italic">Hình ảnh đường mạch in</div>
+                                <img id="img_trace" class="preview-img shadow-sm" alt="Trace">
                             </div>
-                            <div class="tab-pane fade" id="drill">
-                                <img src="https://modish-jay-unviolently.ngrok-free.dev/image/FINAL_drill.png" class="preview-img shadow-sm" alt="Drill">
-                                <div class="mt-2 text-muted fst-italic">Vị trí các lỗ khoan</div>
                             </div>
-                            <div class="tab-pane fade" id="outline">
-                                <img src="https://modish-jay-unviolently.ngrok-free.dev/image/FINAL_outline.png" class="preview-img shadow-sm" alt="Outline">
-                                <div class="mt-2 text-muted fst-italic">Đường cắt bao ngoài</div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <script>
+        const NGROK_URL = "https://modish-jay-unviolently.ngrok-free.dev";
+        
+        // Hiển thị kích thước
+        document.getElementById('val_w').innerText = localStorage.getItem('pcb_w_mm') || 0;
+        document.getElementById('val_h').innerText = localStorage.getItem('pcb_h_mm') || 0;
+        
+        // Tải ảnh từ Server máy tính
+        document.getElementById('img_trace').src = `${NGROK_URL}/image/FINAL_trace.png`;
+        // document.getElementById('img_drill').src = `${NGROK_URL}/image/FINAL_drill.png`;
+        // document.getElementById('img_outline').src = `${NGROK_URL}/image/FINAL_outline.png`;
+
+        // Xử lý nút Tiếp Theo
+        document.getElementById('optionsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            localStorage.setItem('pcb_qty', document.getElementById('quantity').value);
+            window.location.href = "position.html";
+        });
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
-
