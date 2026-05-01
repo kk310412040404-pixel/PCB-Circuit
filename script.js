@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // PHẦN 2: LOGIC CHO TRANG POSITION (BƯỚC 3)
     // ============================================================
     const bed = document.getElementById('bed-container');
-    
+    const NGROK_URL = "https://modish-jay-unviolently.ngrok-free.dev";
     if (bed) {
         // --- CHỐT CỨNG KÍCH THƯỚC BÀN MÁY ---
         const BOARD_REAL_W_MM = 200.0;
@@ -41,10 +41,12 @@ document.addEventListener("DOMContentLoaded", function() {
         const dataEl = document.getElementById('server-data');
 
         // Kích thước PCB
-        const PCB_QTY = parseInt(dataEl.dataset.qty) || 1;
-        const PCB_W_MM = parseFloat(dataEl.dataset.w) || 10;
-        const PCB_H_MM = parseFloat(dataEl.dataset.h) || 10;
-
+        //const PCB_QTY = parseInt(dataEl.dataset.qty) || 1;
+        //const PCB_W_MM = parseFloat(dataEl.dataset.w) || 10;
+        //const PCB_H_MM = parseFloat(dataEl.dataset.h) || 10;
+        const PCB_QTY = parseInt(localStorage.getItem('pcb_qty') || 1);
+        const PCB_W_MM = parseFloat(localStorage.getItem('pcb_w_mm') || 0);
+        const PCB_H_MM = parseFloat(localStorage.getItem('pcb_h_mm') || 0);
         let pixelsPerMM = 1; 
         let pcbList = [];   
 
@@ -79,12 +81,32 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         }
 
-        window.submitGcodeGeneration = function() {
-            const input = document.getElementById('gcodeFilename');
-            let filename = input.value.trim() || "my_pcb_panel";
-            closeModal();
-            executeGeneration(filename);
-        };
+        window.submitGcodeGeneration = async function() {
+            const filename = document.getElementById('filenameInput').value;
+            const analysisData = JSON.parse(localStorage.getItem('pcb_analysis')); // Lấy data não ra
+            
+            try {
+                const response = await fetch(`${NGROK_URL}/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        offsets: pcbList, 
+                        filename: filename,
+                        analysis: analysisData // Truyền lại cho server tính
+                    })
+                });
+                const result = await response.json();
+                
+                if (result.status === 'ok') {
+                    localStorage.setItem('pcb_gcode_filename', result.filename); // Lưu tên file
+                    // Hiện Modal thành công... (giữ nguyên code cũ của bạn)
+                } else {
+                    alert("Lỗi: " + result.error);
+                }
+            } catch (e) {
+                alert("Lỗi kết nối server!");
+            }
+        }
 
         function executeGeneration(filename) {
             if (!filename.endsWith('.nc')) filename += ".nc";
@@ -299,13 +321,21 @@ document.addEventListener("DOMContentLoaded", function() {
             panel.innerHTML = html;
         }
 
-        window.saveFile = function() { window.location.href = "/download"; };
+        window.saveFile = function() { 
+            const fname = localStorage.getItem('pcb_gcode_filename');
+            window.location.href = `${NGROK_URL}/download?filename=${fname}`; 
+        };
+        
         window.uploadToPi = function() {
             if (!confirm("Nạp code vào máy CNC?")) return;
-            fetch('/upload_serial', { method: 'POST' })
+            fetch(`${NGROK_URL}/upload_serial`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: localStorage.getItem('pcb_gcode_filename') })
+            })
             .then(r => r.json()).then(d => {
-                alert(d.status === 'ok' ? "✅ " + d.message : "❌ " + d.error);
-            }).catch(() => alert("Lỗi kết nối!"));
+                alert(d.status === 'ok' ? "✅ Gửi thành công!" : "❌ Lỗi: " + d.error);
+            });
         };
 
         window.addEventListener('resize', updateScale);
