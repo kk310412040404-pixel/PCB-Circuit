@@ -485,9 +485,7 @@
                 <span style="color:var(--error-text)">● ${errors} Lỗi</span> | <span style="color:var(--warning-text)">● ${warnings} Cảnh báo</span></div>` + html;
         }
 
-        function resetApp() {
-            location.reload(); // Cách nhanh nhất để reset toàn bộ trạng thái
-        }
+        function resetApp() { if(confirm("Bạn có chắc muốn làm mạch mới?")) window.location.href = '/'; }
     </script>
 </body>
 </html>
