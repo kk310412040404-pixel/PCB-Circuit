@@ -82,9 +82,19 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         window.submitGcodeGeneration = async function() {
-            const filename = document.getElementById('filenameInput').value;
-            const analysisData = JSON.parse(localStorage.getItem('pcb_analysis')); // Lấy data não ra
+            const inputEl = document.getElementById('gcodeFilename');
+            let filename = inputEl ? inputEl.value : "output.nc";
+            if (!filename.trim()) filename = "output.nc";
+            if (!filename.endsWith('.nc')) filename += ".nc";
+
+            const analysisData = JSON.parse(localStorage.getItem('pcb_analysis'));
             
+            const btnConfirm = document.querySelector('#filenameModal .btn-success');
+            if(btnConfirm) {
+                btnConfirm.innerHTML = '⏳ Đang xử lý...';
+                btnConfirm.disabled = true;
+            }
+
             try {
                 const response = await fetch(`${NGROK_URL}/generate`, {
                     method: 'POST',
@@ -92,19 +102,47 @@ document.addEventListener("DOMContentLoaded", function() {
                     body: JSON.stringify({ 
                         offsets: pcbList, 
                         filename: filename,
-                        analysis: analysisData // Truyền lại cho server tính
+                        analysis: analysisData // Truyền dữ liệu về cho Python
                     })
                 });
-                const result = await response.json();
+                const data = await response.json();
                 
-                if (result.status === 'ok') {
-                    localStorage.setItem('pcb_gcode_filename', result.filename); // Lưu tên file
-                    // Hiện Modal thành công... (giữ nguyên code cũ của bạn)
+                if (data.status === 'ok') {
+                    // Lưu tên file vào bộ nhớ trình duyệt
+                    localStorage.setItem('pcb_gcode_filename', data.filename);
+                    
+                    // --- ĐÃ SỬA FIX LỖI: Đóng modal trực tiếp không dùng hàm ngoài ---
+                    const fModal = document.getElementById('filenameModal');
+                    if (fModal) fModal.classList.remove('show');
+                    
+                    if (successMsg) successMsg.innerText = `Đã tạo xong file: ${data.filename}`;              
+                    document.querySelector('#successModal .modal-footer').innerHTML = `
+                        <button type="button" class="btn btn-secondary" onclick="closeSuccessModal()">Đóng</button>
+                        <a href="preview.html?filename=${data.filename}" class="btn btn-primary fw-bold">
+                            👁️ Xem mô phỏng (3D)
+                        </a>
+                    `;
+                    
+                    if (successModal) successModal.classList.add('show');
+                    
+                    // Ẩn nút "Tạo V-CODE" và hiện cụm nút Lưu/Nạp CNC
+                    if(btnCreate) btnCreate.style.display = 'none';
+                    if(actionDiv) {
+                        actionDiv.classList.remove('d-none');
+                        actionDiv.style.display = 'flex';     
+                    }
                 } else {
-                    alert("Lỗi: " + result.error);
+                    alert("❌ Lỗi: " + data.error);
                 }
             } catch (e) {
-                alert("Lỗi kết nối server!");
+                alert("Lỗi kết nối server Ngrok!");
+                console.error(e);
+            } finally {
+                // Phục hồi lại nút bấm nếu bị lỗi
+                if(btnConfirm) {
+                    btnConfirm.innerHTML = 'Xác nhận tạo';
+                    btnConfirm.disabled = false;
+                }
             }
         }
 
