@@ -560,7 +560,7 @@
 
         if (data.status === 'ok') {
             // CHỈ truyền ảnh
-            window.location.href = `/assessment?defect=${data.defective}&optimized=${data.optimized}`;
+            window.location.href = `/assessment?defect=${localStorage.defective}&optimized=${localStorage.optimized}`;
         } else {
             alert(data.message);
         }
