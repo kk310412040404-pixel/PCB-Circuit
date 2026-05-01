@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Upload Files PCB</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css"> 
 </head>
 <body>
     <div class="container">
         <h1>NHẬP FILE</h1>
-        <form action="https://modish-jay-unviolently.ngrok-free.dev/upload" method="post" enctype="multipart/form-data">
+        <form id="uploadForm">
             <div class="form-group">
                 <label>File Trace</label>
                 <input type="file" name="trace" required accept=".pdf">
@@ -21,8 +21,40 @@
                 <label>File Outline</label>
                 <input type="file" name="outline" required accept=".pdf">
             </div>
-            <button type="submit">TIẾP THEO (NEXT) &rarr;</button>
+            <button type="submit" id="submitBtn">TIẾP THEO (NEXT) &rarr;</button>
         </form>
     </div>
+
+    <script>
+        const NGROK_URL = "https://modish-jay-unviolently.ngrok-free.dev";
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.innerText = "Đang xử lý..."; btn.disabled = true;
+
+            try {
+                const response = await fetch(`${NGROK_URL}/upload`, {
+                    method: 'POST',
+                    body: new FormData(this)
+                });
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Lưu dữ liệu vào bộ nhớ trình duyệt để dùng cho các trang sau
+                    localStorage.setItem('pcb_analysis', JSON.stringify(data.analysis));
+                    localStorage.setItem('pcb_w_mm', data.w_mm);
+                    localStorage.setItem('pcb_h_mm', data.h_mm);
+                    window.location.href = "options.html"; // Tự động chuyển trang
+                } else {
+                    alert("Lỗi: " + data.message);
+                    btn.innerText = "TIẾP THEO (NEXT) &rarr;"; btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Không thể kết nối đến server máy tính (Ngrok)!");
+                btn.innerText = "TIẾP THEO (NEXT) &rarr;"; btn.disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>
